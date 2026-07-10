@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import "dotenv/config";
-import express from "express"; // <-- TAMBAHKAN INI
+import express from "express";
 console.log(
   "STRIPE_SECRET_KEY:",
   process.env.STRIPE_SECRET_KEY ? "ADA" : "TIDAK ADA",
@@ -24,7 +24,6 @@ import productRoutes from "./routes/product.route.js";
 import cartRoutes from "./routes/cart.route.js";
 import paymentRoutes from "./routes/payment.route.js";
 
-// ✅ TAMBAHKAN: import notification routes
 import notificationRoutes from "./routes/notification.route.js";
 
 const app = express();
@@ -58,7 +57,6 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
 
-// ✅ TAMBAHKAN: route notification
 app.use("/api/notifications", notificationRoutes);
 
 app.get("/api/health", (req, res) => {
@@ -66,19 +64,17 @@ app.get("/api/health", (req, res) => {
 });
 
 // make our app ready for deployment
-if (ENV.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../admin/dist")));
-
-  app.get("/{*any}", (req, res) => {
-    res.sendFile(path.join(__dirname, "../admin", "dist", "index.html"));
-  });
-}
+// (blok static file admin/dist DIHAPUS karena admin di-deploy terpisah di Vercel)
 
 const startServer = async () => {
   await connectDB();
-  app.listen(ENV.PORT, () => {
-    console.log("Server is up and running");
-  });
+  if (ENV.NODE_ENV !== "production") {
+    app.listen(ENV.PORT, () => {
+      console.log("Server is up and running");
+    });
+  }
 };
 
 startServer();
+
+export default app;
