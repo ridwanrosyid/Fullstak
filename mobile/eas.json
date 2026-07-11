@@ -1,0 +1,29 @@
+{
+  "cli": {
+    "version": ">= 20.5.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_dG9nZXRoZXItcHJpbWF0ZS0zNC5jbGVyay5hY2NvdW50cy5kZXYk",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TgzgFJVNqDGpa9pRenIZkaZqIoEUY9dtrBwRaGDfpOXVZRNnu4PrO2PUfuornfnr9IIgwy3VfQSjuRNU2HANbr200wUtGe9F3"
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
