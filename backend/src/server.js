@@ -23,30 +23,26 @@ import reviewRoutes from "./routes/review.route.js";
 import productRoutes from "./routes/product.route.js";
 import cartRoutes from "./routes/cart.route.js";
 import paymentRoutes from "./routes/payment.route.js";
-
 import notificationRoutes from "./routes/notification.route.js";
 
 const app = express();
 
-const __dirname = path.resolve();
-
 // special handling: Stripe webhook needs raw body BEFORE any body parsing middleware
-// apply raw body parser conditionally only to webhook endpoint
 app.use(
   "/api/payment",
   (req, res, next) => {
     if (req.originalUrl === "/api/payment/webhook") {
       express.raw({ type: "application/json" })(req, res, next);
     } else {
-      express.json()(req, res, next); // parse json for non-webhook routes
+      express.json()(req, res, next);
     }
   },
   paymentRoutes,
 );
 
 app.use(express.json());
-app.use(clerkMiddleware()); // adds auth object under the req => req.auth
-app.use(cors({ origin: ENV.CLIENT_URL, credentials: true })); // credentials: true allows the browser to send the cookies to the server with the request
+app.use(clerkMiddleware());
+app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
 
 app.use("/api/inngest", serve({ client: inngest, functions }));
 
@@ -56,25 +52,30 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
-
 app.use("/api/notifications", notificationRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ message: "Success" });
 });
 
-// make our app ready for deployment
-// (blok static file admin/dist DIHAPUS karena admin di-deploy terpisah di Vercel)
+// --- Koneksi database ---
+// Di serverless (Vercel), koneksi dibuat sekali dan dipakai ulang antar request
+let dbConnected = false;
 
-const startServer = async () => {
-  await connectDB();
-  if (ENV.NODE_ENV !== "production") {
-    app.listen(ENV.PORT, () => {
-      console.log("Server is up and running");
-    });
+const initDB = async () => {
+  if (!dbConnected) {
+    await connectDB();
+    dbConnected = true;
   }
 };
 
-startServer();
+await initDB();
+
+// Hanya jalankan app.listen() kalau BUKAN di lingkungan Vercel (misal dev lokal)
+if (!process.env.VERCEL) {
+  app.listen(ENV.PORT, () => {
+    console.log("Server is up and running");
+  });
+}
 
 export default app;

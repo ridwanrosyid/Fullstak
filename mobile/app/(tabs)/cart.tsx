@@ -10,7 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useStripe } from "@stripe/stripe-react-native";
+// ⚠️ Stripe native tidak didukung di web, jadi kita stub manual di bawah
+// import { useStripe } from "@stripe/stripe-react-native";
 import { useState } from "react";
 import { Address } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,27 @@ import PaymentMethodModal from "@/components/PaymentMethodModal";
 import QrisPaymentModal from "@/components/QrisPaymentModal";
 
 import * as Sentry from "@sentry/react-native";
+
+// ===== STUB useStripe untuk versi WEB =====
+// Card payment via Stripe native tidak bisa jalan di browser,
+// jadi kita ganti dengan fungsi dummy yang selalu return error.
+// Semua kode lain (handleProceedWithPayment, dll) tetap ada dan tidak dihapus,
+// hanya saja tidak akan pernah dipanggil di web karena sudah di-guard.
+const useStripe = () => ({
+  initPaymentSheet: async (_options?: any) => ({
+    error: {
+      code: "Failed",
+      message: "Card payment is not available on web",
+    } as any,
+  }),
+  presentPaymentSheet: async (_options?: any) => ({
+    error: {
+      code: "Failed",
+      message: "Card payment is not available on web",
+    } as any,
+  }),
+});
+// ============================================
 
 // ✨ Fungsi format Rupiah (hanya untuk tampilan, tidak mengubah nilai asli)
 const formatRupiah = (amount: number) => {
@@ -119,18 +141,28 @@ const CartScreen = () => {
     setPaymentMethodModalVisible(true);
   };
 
+  // ===== DIUBAH untuk WEB: metode "card" di-guard, arahkan ke QRIS =====
   const handlePaymentMethodSelected = (method: "card" | "qris") => {
     setPaymentMethodModalVisible(false);
 
     if (!selectedAddress) return;
 
     if (method === "card") {
-      handleProceedWithPayment(selectedAddress);
-    } else {
-      handleProceedWithQris(selectedAddress);
+      Alert.alert(
+        "Not available",
+        "Card payment is not available on web version. Please use QRIS instead.",
+        [{ text: "OK" }],
+      );
+      return;
     }
-  };
 
+    handleProceedWithQris(selectedAddress);
+  };
+  // ======================================================================
+
+  // Kode ini tetap dipertahankan seperti aslinya walau tidak akan pernah
+  // terpanggil di web (karena sudah di-guard di handlePaymentMethodSelected).
+  // Ini menjaga agar struktur & logic sama persis dengan versi mobile.
   const handleProceedWithPayment = async (selectedAddress: Address) => {
     Sentry.logger.info("Checkout initiated (card)", {
       itemCount: cartItemCount,
