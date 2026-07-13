@@ -5,7 +5,13 @@ import { Review } from "../models/review.model.js";
 export async function createOrder(req, res) {
   try {
     const user = req.user;
-    const { orderItems, shippingAddress, paymentResult, totalPrice } = req.body;
+    const {
+      orderItems,
+      shippingAddress,
+      paymentMethod,
+      paymentResult,
+      totalPrice,
+    } = req.body;
 
     if (!orderItems || orderItems.length === 0) {
       return res.status(400).json({ error: "No order items" });
@@ -13,12 +19,16 @@ export async function createOrder(req, res) {
 
     // validate products and stock
     for (const item of orderItems) {
-      const product = await Product.findById(item.product._id);
+      const product = await Product.findById(item.product);
       if (!product) {
-        return res.status(404).json({ error: `Product ${item.name} not found` });
+        return res
+          .status(404)
+          .json({ error: `Product ${item.name} not found` });
       }
       if (product.stock < item.quantity) {
-        return res.status(400).json({ error: `Insufficient stock for ${product.name}` });
+        return res
+          .status(400)
+          .json({ error: `Insufficient stock for ${product.name}` });
       }
     }
 
@@ -27,13 +37,14 @@ export async function createOrder(req, res) {
       clerkId: user.clerkId,
       orderItems,
       shippingAddress,
+      paymentMethod,
       paymentResult,
       totalPrice,
     });
 
     // update product stock
     for (const item of orderItems) {
-      await Product.findByIdAndUpdate(item.product._id, {
+      await Product.findByIdAndUpdate(item.product, {
         $inc: { stock: -item.quantity },
       });
     }
@@ -51,11 +62,11 @@ export async function getUserOrders(req, res) {
       .populate("orderItems.product")
       .sort({ createdAt: -1 });
 
-    // check if each order has been reviewed
-
     const orderIds = orders.map((order) => order._id);
     const reviews = await Review.find({ orderId: { $in: orderIds } });
-    const reviewedOrderIds = new Set(reviews.map((review) => review.orderId.toString()));
+    const reviewedOrderIds = new Set(
+      reviews.map((review) => review.orderId.toString()),
+    );
 
     const ordersWithReviewStatus = await Promise.all(
       orders.map(async (order) => {
@@ -63,7 +74,7 @@ export async function getUserOrders(req, res) {
           ...order.toObject(),
           hasReviewed: reviewedOrderIds.has(order._id.toString()),
         };
-      })
+      }),
     );
 
     res.status(200).json({ orders: ordersWithReviewStatus });

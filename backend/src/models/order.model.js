@@ -69,6 +69,11 @@ const orderSchema = new mongoose.Schema(
       type: shippingAddressSchema,
       required: true,
     },
+    paymentMethod: {
+      type: String,
+      enum: ["cod", "transfer"],
+      default: "cod",
+    },
     paymentResult: {
       id: String,
       status: String,
@@ -90,7 +95,7 @@ const orderSchema = new mongoose.Schema(
       type: Date,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export const Order = mongoose.model("Order", orderSchema);

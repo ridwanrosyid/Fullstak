@@ -4,7 +4,7 @@ import { Modal, Text, TouchableOpacity, View } from "react-native";
 interface PaymentMethodModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelect: (method: "card" | "qris") => void;
+  onSelect: (method: "cod" | "transfer") => void;
 }
 
 const PaymentMethodModal = ({
@@ -37,17 +37,17 @@ const PaymentMethodModal = ({
             <TouchableOpacity
               className="bg-surface rounded-3xl p-6 flex-row items-center border-2 border-background-lighter"
               activeOpacity={0.7}
-              onPress={() => onSelect("card")}
+              onPress={() => onSelect("cod")}
             >
               <View className="bg-primary/20 rounded-full p-3 mr-4">
-                <Ionicons name="card-outline" size={28} color="#1DB954" />
+                <Ionicons name="cash-outline" size={28} color="#1DB954" />
               </View>
               <View className="flex-1">
                 <Text className="text-text-primary font-bold text-lg">
-                  Card / Bank Transfer
+                  Cash on Delivery (COD)
                 </Text>
                 <Text className="text-text-secondary text-sm mt-1">
-                  Pay with credit card or virtual account
+                  Pay with cash when the order arrives
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#666" />
@@ -56,17 +56,17 @@ const PaymentMethodModal = ({
             <TouchableOpacity
               className="bg-surface rounded-3xl p-6 flex-row items-center border-2 border-background-lighter"
               activeOpacity={0.7}
-              onPress={() => onSelect("qris")}
+              onPress={() => onSelect("transfer")}
             >
               <View className="bg-primary/20 rounded-full p-3 mr-4">
-                <Ionicons name="qr-code-outline" size={28} color="#1DB954" />
+                <Ionicons name="business-outline" size={28} color="#1DB954" />
               </View>
               <View className="flex-1">
                 <Text className="text-text-primary font-bold text-lg">
-                  QRIS
+                  Bank Transfer
                 </Text>
                 <Text className="text-text-secondary text-sm mt-1">
-                  Pay with GoPay, OVO, DANA, and other e-wallets
+                  Transfer to our bank account
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#666" />

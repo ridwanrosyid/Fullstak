@@ -10,8 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-// ⚠️ Stripe native tidak didukung di web, jadi kita stub manual di bawah
-// import { useStripe } from "@stripe/stripe-react-native";
 import { useState } from "react";
 import { Address } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,30 +17,8 @@ import { Image } from "expo-image";
 import OrderSummary from "@/components/OrderSummary";
 import AddressSelectionModal from "@/components/AddressSelectionModal";
 import PaymentMethodModal from "@/components/PaymentMethodModal";
-import QrisPaymentModal from "@/components/QrisPaymentModal";
 
 import * as Sentry from "@sentry/react-native";
-
-// ===== STUB useStripe untuk versi WEB =====
-// Card payment via Stripe native tidak bisa jalan di browser,
-// jadi kita ganti dengan fungsi dummy yang selalu return error.
-// Semua kode lain (handleProceedWithPayment, dll) tetap ada dan tidak dihapus,
-// hanya saja tidak akan pernah dipanggil di web karena sudah di-guard.
-const useStripe = () => ({
-  initPaymentSheet: async (_options?: any) => ({
-    error: {
-      code: "Failed",
-      message: "Card payment is not available on web",
-    } as any,
-  }),
-  presentPaymentSheet: async (_options?: any) => ({
-    error: {
-      code: "Failed",
-      message: "Card payment is not available on web",
-    } as any,
-  }),
-});
-// ============================================
 
 // ✨ Fungsi format Rupiah (hanya untuk tampilan, tidak mengubah nilai asli)
 const formatRupiah = (amount: number) => {
@@ -51,6 +27,9 @@ const formatRupiah = (amount: number) => {
     maximumFractionDigits: 2,
   })}`;
 };
+
+// ⚠️ GANTI dengan info rekening bank kamu yang sebenarnya
+const BANK_ACCOUNT_INFO = "BCA 1234567890 a.n Toko Kamu";
 
 const CartScreen = () => {
   const api = useApi();
@@ -68,34 +47,22 @@ const CartScreen = () => {
   } = useCart();
   const { addresses } = useAddresses();
 
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
-
-  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [orderLoading, setOrderLoading] = useState(false);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [paymentMethodModalVisible, setPaymentMethodModalVisible] =
     useState(false);
-  const [qrisModalVisible, setQrisModalVisible] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const [qrisData, setQrisData] = useState<{
-    qrCodeUrl: string | null;
-    orderId: string | null;
-  }>({ qrCodeUrl: null, orderId: null });
 
-  // ===== DIUBAH: filter item yang product-nya null =====
   const cartItems = cart?.items.filter((item) => item.product) || [];
-  // ======================================================
 
-  // ✅ PERBAIKAN: hitung subtotal dengan konversi USD→IDR jika harga masih USD
   const subtotal = cartItems.reduce((sum, item) => {
     const price = item.product?.price ?? 0;
-    // Jika harga < 1000, anggap masih dalam USD, konversi ke IDR × 5000
     const priceInIDR = price < 1000 ? price * 5000 : price;
     return sum + priceInIDR * item.quantity;
   }, 0);
-  // ======================================================
 
-  const shipping = 50000; // biaya kirim dalam Rupiah
-  const tax = subtotal * 0.08; // 8% pajak
+  const shipping = 50000;
+  const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
 
   const handleQuantityChange = (
@@ -134,164 +101,96 @@ const CartScreen = () => {
     setAddressModalVisible(true);
   };
 
-  // Dipanggil setelah user pilih alamat -> lanjut ke pilih metode bayar
   const handleAddressSelected = (address: Address) => {
     setSelectedAddress(address);
     setAddressModalVisible(false);
     setPaymentMethodModalVisible(true);
   };
 
-  // ===== DIUBAH untuk WEB: metode "card" di-guard, arahkan ke QRIS =====
-  const handlePaymentMethodSelected = (method: "card" | "qris") => {
+  const handlePaymentMethodSelected = (method: "cod" | "transfer") => {
     setPaymentMethodModalVisible(false);
-
     if (!selectedAddress) return;
-
-    if (method === "card") {
-      Alert.alert(
-        "Not available",
-        "Card payment is not available on web version. Please use QRIS instead.",
-        [{ text: "OK" }],
-      );
-      return;
-    }
-
-    handleProceedWithQris(selectedAddress);
+    handleProceedWithOrder(selectedAddress, method);
   };
-  // ======================================================================
 
-  // Kode ini tetap dipertahankan seperti aslinya walau tidak akan pernah
-  // terpanggil di web (karena sudah di-guard di handlePaymentMethodSelected).
-  // Ini menjaga agar struktur & logic sama persis dengan versi mobile.
-  const handleProceedWithPayment = async (selectedAddress: Address) => {
-    Sentry.logger.info("Checkout initiated (card)", {
+  const handleProceedWithOrder = async (
+    address: Address,
+    method: "cod" | "transfer",
+  ) => {
+    Sentry.logger.info("Checkout initiated", {
       itemCount: cartItemCount,
       total: total.toFixed(2),
-      city: selectedAddress.city,
+      city: address.city,
+      method,
     });
 
     try {
-      setPaymentLoading(true);
+      setOrderLoading(true);
 
-      const { data } = await api.post("/payment/create-intent", {
-        cartItems,
+      const orderItems = cartItems.map((item) => ({
+        product: item.product?._id,
+        name: item.product?.name,
+        price:
+          (item.product?.price ?? 0) < 1000
+            ? (item.product?.price ?? 0) * 5000
+            : (item.product?.price ?? 0),
+        quantity: item.quantity,
+        image: item.product?.images?.[0],
+      }));
+
+      const paymentResult =
+        method === "cod"
+          ? { id: `COD-${Date.now()}`, status: "pending_cod" }
+          : { id: `TRANSFER-${Date.now()}`, status: "pending_transfer" };
+
+      await api.post("/orders", {
+        orderItems,
         shippingAddress: {
-          fullName: selectedAddress.fullName,
-          streetAddress: selectedAddress.streetAddress,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          zipCode: selectedAddress.zipCode,
-          phoneNumber: selectedAddress.phoneNumber,
+          fullName: address.fullName,
+          streetAddress: address.streetAddress,
+          city: address.city,
+          state: address.state,
+          zipCode: address.zipCode,
+          phoneNumber: address.phoneNumber,
         },
-        total: total, // kirim total ke backend
+        paymentMethod: method,
+        paymentResult,
+        totalPrice: total,
       });
 
-      const { error: initError } = await initPaymentSheet({
-        paymentIntentClientSecret: data.clientSecret,
-        merchantDisplayName: "Your Store Name",
+      Sentry.logger.info("Order created successfully", {
+        total: total.toFixed(2),
+        itemCount: cartItems.length,
+        method,
       });
 
-      if (initError) {
-        Sentry.logger.error("Payment sheet init failed", {
-          errorCode: initError.code,
-          errorMessage: initError.message,
-          cartTotal: total,
-          itemCount: cartItems.length,
-        });
-
-        Alert.alert("Error", initError.message);
-        setPaymentLoading(false);
-        return;
-      }
-
-      const { error: presentError } = await presentPaymentSheet();
-
-      if (presentError) {
-        Sentry.logger.error("Payment cancelled", {
-          errorCode: presentError.code,
-          errorMessage: presentError.message,
-          cartTotal: total,
-          itemCount: cartItems.length,
-        });
-
-        Alert.alert("Payment cancelled", presentError.message);
-      } else {
-        Sentry.logger.info("Payment successful", {
-          total: total.toFixed(2),
-          itemCount: cartItems.length,
-        });
-
+      if (method === "cod") {
         Alert.alert(
-          "Success",
-          "Your payment was successful! Your order is being processed.",
-          [{ text: "OK", onPress: () => {} }],
+          "Order Berhasil!",
+          "Pesanan kamu sudah masuk. Silakan bayar tunai saat barang sampai (COD).",
+          [{ text: "OK" }],
         );
-        clearCart();
+      } else {
+        Alert.alert(
+          "Order Berhasil!",
+          `Pesanan kamu sudah masuk. Silakan transfer ke:\n\n${BANK_ACCOUNT_INFO}\n\nlalu konfirmasi ke admin.`,
+          [{ text: "OK" }],
+        );
       }
+
+      clearCart();
     } catch (error) {
-      Sentry.logger.error("Payment failed", {
+      Sentry.logger.error("Order failed", {
         error: error instanceof Error ? error.message : "Unknown error",
         cartTotal: total,
         itemCount: cartItems.length,
+        method,
       });
 
-      Alert.alert("Error", "Failed to process payment");
+      Alert.alert("Error", "Failed to create order. Please try again.");
     } finally {
-      setPaymentLoading(false);
+      setOrderLoading(false);
     }
-  };
-
-  const handleProceedWithQris = async (selectedAddress: Address) => {
-    Sentry.logger.info("Checkout initiated (qris)", {
-      itemCount: cartItemCount,
-      total: total.toFixed(2),
-      city: selectedAddress.city,
-    });
-
-    try {
-      setPaymentLoading(true);
-
-      const { data } = await api.post("/payment/create-qris", {
-        cartItems,
-        shippingAddress: {
-          fullName: selectedAddress.fullName,
-          streetAddress: selectedAddress.streetAddress,
-          city: selectedAddress.city,
-          state: selectedAddress.state,
-          zipCode: selectedAddress.zipCode,
-          phoneNumber: selectedAddress.phoneNumber,
-        },
-        total: total,
-      });
-
-      setQrisData({
-        qrCodeUrl: data.qrCodeUrl,
-        orderId: data.orderId,
-      });
-      setQrisModalVisible(true);
-    } catch (error) {
-      Sentry.logger.error("QRIS payment failed", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        cartTotal: total,
-        itemCount: cartItems.length,
-      });
-
-      Alert.alert("Error", "Failed to generate QRIS payment");
-    } finally {
-      setPaymentLoading(false);
-    }
-  };
-
-  const handleQrisSuccess = () => {
-    setQrisModalVisible(false);
-
-    Alert.alert(
-      "Success",
-      "Your payment was successful! Your order is being processed.",
-      [{ text: "OK", onPress: () => {} }],
-    );
-
-    clearCart();
   };
 
   if (isLoading) return <LoadingUI />;
@@ -449,10 +348,10 @@ const CartScreen = () => {
           className="bg-primary rounded-2xl overflow-hidden"
           activeOpacity={0.9}
           onPress={handleCheckout}
-          disabled={paymentLoading}
+          disabled={orderLoading}
         >
           <View className="py-5 flex-row items-center justify-center">
-            {paymentLoading ? (
+            {orderLoading ? (
               <ActivityIndicator size="small" color="#121212" />
             ) : (
               <>
@@ -470,22 +369,13 @@ const CartScreen = () => {
         visible={addressModalVisible}
         onClose={() => setAddressModalVisible(false)}
         onProceed={handleAddressSelected}
-        isProcessing={paymentLoading}
+        isProcessing={orderLoading}
       />
 
       <PaymentMethodModal
         visible={paymentMethodModalVisible}
         onClose={() => setPaymentMethodModalVisible(false)}
         onSelect={handlePaymentMethodSelected}
-      />
-
-      <QrisPaymentModal
-        visible={qrisModalVisible}
-        onClose={() => setQrisModalVisible(false)}
-        onSuccess={handleQrisSuccess}
-        qrCodeUrl={qrisData.qrCodeUrl}
-        orderId={qrisData.orderId}
-        amount={total}
       />
     </SafeScreen>
   );
