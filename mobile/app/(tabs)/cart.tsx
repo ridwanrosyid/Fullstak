@@ -61,7 +61,7 @@ const CartScreen = () => {
     return sum + priceInIDR * item.quantity;
   }, 0);
 
-  const shipping = 50000;
+  const shipping = 10000;
   const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
 

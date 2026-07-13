@@ -8,7 +8,21 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+const formatRupiah = (amount: number) => {
+  return `Rp ${amount.toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 function OrdersScreen() {
   const { data: orders, isLoading, isError } = useOrders();
@@ -16,13 +30,14 @@ function OrdersScreen() {
 
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [productRatings, setProductRatings] = useState<{ [key: string]: number }>({});
+  const [productRatings, setProductRatings] = useState<{
+    [key: string]: number;
+  }>({});
 
   const handleOpenRating = (order: Order) => {
     setShowRatingModal(true);
     setSelectedOrder(order);
 
-    // init ratings for all product to 0 - resettin the state for each product
     const initialRatings: { [key: string]: number } = {};
     order.orderItems.forEach((item) => {
       const productId = item.product._id;
@@ -34,8 +49,9 @@ function OrdersScreen() {
   const handleSubmitRating = async () => {
     if (!selectedOrder) return;
 
-    // check if all products have been rated
-    const allRated = Object.values(productRatings).every((rating) => rating > 0);
+    const allRated = Object.values(productRatings).every(
+      (rating) => rating > 0,
+    );
     if (!allRated) {
       Alert.alert("Error", "Please rate all products");
       return;
@@ -49,7 +65,7 @@ function OrdersScreen() {
             orderId: selectedOrder._id,
             rating: productRatings[item.product._id],
           });
-        })
+        }),
       );
 
       Alert.alert("Success", "Thank you for rating all products!");
@@ -57,7 +73,10 @@ function OrdersScreen() {
       setSelectedOrder(null);
       setProductRatings({});
     } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.error || "Failed to submit rating");
+      Alert.alert(
+        "Error",
+        error?.response?.data?.error || "Failed to submit rating",
+      );
     }
   };
 
@@ -85,11 +104,17 @@ function OrdersScreen() {
         >
           <View className="px-6 py-4">
             {orders.map((order) => {
-              const totalItems = order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+              const totalItems = order.orderItems.reduce(
+                (sum, item) => sum + item.quantity,
+                0,
+              );
               const firstImage = order.orderItems[0]?.image || "";
 
               return (
-                <View key={order._id} className="bg-surface rounded-3xl p-5 mb-4">
+                <View
+                  key={order._id}
+                  className="bg-surface rounded-3xl p-5 mb-4"
+                >
                   <View className="flex-row mb-4">
                     <View className="relative">
                       <Image
@@ -98,7 +123,6 @@ function OrdersScreen() {
                         contentFit="cover"
                       />
 
-                      {/* BADGE FOR MORE ITEMS */}
                       {order.orderItems.length > 1 && (
                         <View className="absolute -bottom-1 -right-1 bg-primary rounded-full size-7 items-center justify-center">
                           <Text className="text-background text-xs font-bold">
@@ -117,7 +141,9 @@ function OrdersScreen() {
                       </Text>
                       <View
                         className="self-start px-3 py-1.5 rounded-full"
-                        style={{ backgroundColor: getStatusColor(order.status) + "20" }}
+                        style={{
+                          backgroundColor: getStatusColor(order.status) + "20",
+                        }}
                       >
                         <Text
                           className="text-xs font-bold"
@@ -129,7 +155,6 @@ function OrdersScreen() {
                     </View>
                   </View>
 
-                  {/* ORDER ITEMS SUMMARY */}
                   {order.orderItems.map((item, index) => (
                     <Text
                       key={item._id}
@@ -142,17 +167,25 @@ function OrdersScreen() {
 
                   <View className="border-t border-background-lighter pt-3 flex-row justify-between items-center">
                     <View>
-                      <Text className="text-text-secondary text-xs mb-1">{totalItems} items</Text>
+                      <Text className="text-text-secondary text-xs mb-1">
+                        {totalItems} items
+                      </Text>
                       <Text className="text-primary font-bold text-xl">
-                        ${order.totalPrice.toFixed(2)}
+                        {formatRupiah(order.totalPrice)}
                       </Text>
                     </View>
 
                     {order.status === "delivered" &&
                       (order.hasReviewed ? (
                         <View className="bg-primary/20 px-5 py-3 rounded-full flex-row items-center">
-                          <Ionicons name="checkmark-circle" size={18} color="#1DB954" />
-                          <Text className="text-primary font-bold text-sm ml-2">Reviewed</Text>
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={18}
+                            color="#1DB954"
+                          />
+                          <Text className="text-primary font-bold text-sm ml-2">
+                            Reviewed
+                          </Text>
                         </View>
                       ) : (
                         <TouchableOpacity
@@ -203,7 +236,9 @@ function ErrorUI() {
   return (
     <View className="flex-1 items-center justify-center px-6">
       <Ionicons name="alert-circle-outline" size={64} color="#FF6B6B" />
-      <Text className="text-text-primary font-semibold text-xl mt-4">Failed to load orders</Text>
+      <Text className="text-text-primary font-semibold text-xl mt-4">
+        Failed to load orders
+      </Text>
       <Text className="text-text-secondary text-center mt-2">
         Please check your connection and try again
       </Text>
@@ -215,7 +250,9 @@ function EmptyUI() {
   return (
     <View className="flex-1 items-center justify-center px-6">
       <Ionicons name="receipt-outline" size={80} color="#666" />
-      <Text className="text-text-primary font-semibold text-xl mt-4">No orders yet</Text>
+      <Text className="text-text-primary font-semibold text-xl mt-4">
+        No orders yet
+      </Text>
       <Text className="text-text-secondary text-center mt-2">
         Your order history will appear here
       </Text>
